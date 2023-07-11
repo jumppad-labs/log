@@ -3,6 +3,8 @@ package log
 import (
 	"fmt"
 	"time"
+
+	"github.com/charmbracelet/lipgloss"
 )
 
 // DefaultTimeFormat is the default time format.
@@ -58,5 +60,6 @@ type Options struct {
 	Fields []interface{}
 	// Formatter is the formatter for the logger. The default is TextFormatter.
 	Formatter Formatter
-	
+	//Renderer is the renderer for the logger.
+	Renderer *lipgloss.Renderer
 }

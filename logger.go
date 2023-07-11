@@ -262,6 +262,11 @@ func (l *Logger) SetOutput(w io.Writer) {
 	}
 }
 
+// SetRenderer sets the renderer for the output
+func (l *Logger) SetRenderer(w io.Writer, r *lipgloss.Renderer) {
+	registry.Store(w, r)
+}
+
 // SetFormatter sets the formatter.
 func (l *Logger) SetFormatter(f Formatter) {
 	l.mu.Lock()

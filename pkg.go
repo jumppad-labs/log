@@ -51,6 +51,10 @@ func NewWithOptions(w io.Writer, o Options) *Logger {
 		callerOffset:    o.CallerOffset,
 	}
 
+	if o.Renderer != nil {
+		l.SetRenderer(w, o.Renderer)
+	}
+
 	l.SetOutput(w)
 	l.SetLevel(Level(l.level))
 
