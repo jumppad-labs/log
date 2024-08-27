@@ -3,15 +3,34 @@ package log
 import (
 	"bytes"
 	"fmt"
+	"io"
 	"os"
 	"os/exec"
 	"path/filepath"
 	"runtime"
+	"strconv"
 	"testing"
 	"time"
 
+	"github.com/muesli/termenv"
 	"github.com/stretchr/testify/assert"
 )
+
+func TestDefaultRace(t *testing.T) {
+	l := Default()
+	t.Cleanup(func() {
+		SetDefault(l)
+	})
+
+	for i := 0; i < 2; i++ {
+		t.Run(strconv.Itoa(i), func(t *testing.T) {
+			t.Parallel()
+
+			SetDefault(New(io.Discard))
+			Default().Info("foo")
+		})
+	}
+}
 
 func TestGlobal(t *testing.T) {
 	var buf bytes.Buffer
@@ -26,7 +45,7 @@ func TestGlobal(t *testing.T) {
 	}{
 		{
 			name:     "default logger info with timestamp",
-			expected: "0001/01/01 00:00:00 INFO info\n",
+			expected: "0002/01/01 00:00:00 INFO info\n",
 			msg:      "info",
 			kvs:      nil,
 			f:        Info,
@@ -40,7 +59,7 @@ func TestGlobal(t *testing.T) {
 		},
 		{
 			name:     "default logger error with timestamp",
-			expected: "0001/01/01 00:00:00 ERRO info\n",
+			expected: "0002/01/01 00:00:00 ERRO info\n",
 			msg:      "info",
 			kvs:      nil,
 			f:        Error,
@@ -63,9 +82,10 @@ func TestPrint(t *testing.T) {
 	SetReportTimestamp(true)
 	SetReportCaller(false)
 	SetTimeFormat(DefaultTimeFormat)
+	SetColorProfile(termenv.ANSI)
 	Error("error")
 	Print("print")
-	assert.Equal(t, "0001/01/01 00:00:00 print\n", buf.String())
+	assert.Equal(t, "0002/01/01 00:00:00 print\n", buf.String())
 }
 
 func TestPrintf(t *testing.T) {
@@ -78,7 +98,7 @@ func TestPrintf(t *testing.T) {
 	SetTimeFormat(DefaultTimeFormat)
 	Errorf("error")
 	Printf("print")
-	assert.Equal(t, "0001/01/01 00:00:00 print\n", buf.String())
+	assert.Equal(t, "0002/01/01 00:00:00 print\n", buf.String())
 }
 
 func TestFatal(t *testing.T) {
@@ -125,7 +145,7 @@ func TestDebugf(t *testing.T) {
 	SetTimeFormat(DefaultTimeFormat)
 	_, file, line, _ := runtime.Caller(0)
 	Debugf("debug %s", "foo")
-	assert.Equal(t, fmt.Sprintf("0001/01/01 00:00:00 DEBU <log/%s:%d> debug foo\n", filepath.Base(file), line+1), buf.String())
+	assert.Equal(t, fmt.Sprintf("0002/01/01 00:00:00 DEBU <log/%s:%d> debug foo\n", filepath.Base(file), line+1), buf.String())
 }
 
 func TestInfof(t *testing.T) {
@@ -148,7 +168,7 @@ func TestWarnf(t *testing.T) {
 	SetTimeFunction(_zeroTime)
 	SetTimeFormat(DefaultTimeFormat)
 	Warnf("warn %s", "foo")
-	assert.Equal(t, "0001/01/01 00:00:00 WARN warn foo\n", buf.String())
+	assert.Equal(t, "0002/01/01 00:00:00 WARN warn foo\n", buf.String())
 }
 
 func TestErrorf(t *testing.T) {
@@ -172,7 +192,7 @@ func TestWith(t *testing.T) {
 	SetTimeFunction(_zeroTime)
 	SetTimeFormat(DefaultTimeFormat)
 	With("foo", "bar").Info("info")
-	assert.Equal(t, "0001/01/01 00:00:00 INFO info foo=bar\n", buf.String())
+	assert.Equal(t, "0002/01/01 00:00:00 INFO info foo=bar\n", buf.String())
 }
 
 func TestGetLevel(t *testing.T) {
@@ -183,12 +203,12 @@ func TestGetLevel(t *testing.T) {
 func TestPrefix(t *testing.T) {
 	var buf bytes.Buffer
 	SetOutput(&buf)
-	SetLevel(InfoLevel)
+	SetLevel(WarnLevel)
 	SetReportCaller(false)
 	SetReportTimestamp(false)
 	SetPrefix("prefix")
-	Info("info")
-	assert.Equal(t, "INFO prefix: info\n", buf.String())
+	Warn("info")
+	assert.Equal(t, "WARN prefix: info\n", buf.String())
 	assert.Equal(t, "prefix", GetPrefix())
 	SetPrefix("")
 }
@@ -201,10 +221,23 @@ func TestFormatter(t *testing.T) {
 	SetReportTimestamp(false)
 	SetFormatter(JSONFormatter)
 	Info("info")
-	assert.Equal(t, "{\"lvl\":\"info\",\"msg\":\"info\"}\n", buf.String())
+	assert.Equal(t, "{\"level\":\"info\",\"msg\":\"info\"}\n", buf.String())
 }
 
 func TestWithPrefix(t *testing.T) {
 	l := WithPrefix("test")
 	assert.Equal(t, "test", l.prefix)
+}
+
+func TestGlobalCustomLevel(t *testing.T) {
+	var buf bytes.Buffer
+	lvl := Level(-1)
+	SetOutput(&buf)
+	SetLevel(lvl)
+	SetReportCaller(false)
+	SetReportTimestamp(false)
+	SetFormatter(JSONFormatter)
+	Log(lvl, "info")
+	Logf(lvl, "hey %s", "you")
+	assert.Equal(t, "{\"msg\":\"info\"}\n{\"msg\":\"hey you\"}\n", buf.String())
 }
